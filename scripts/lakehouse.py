@@ -12,7 +12,11 @@ import os
 from pathlib import Path
 
 # Repo-local lakehouse — easy to inspect, easy to wipe.
-ROOT = Path(os.environ.get("LAKEHOUSE_ROOT", Path(__file__).resolve().parents[1] / "_lakehouse"))
+_DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "_lakehouse"
+# If a MinIO/S3 endpoint is configured, default to the MinIO lakehouse bucket.
+_ENV_ROOT = os.environ.get("LAKEHOUSE_ROOT")
+_MINIO_ENDPOINT = os.environ.get("AWS_ENDPOINT_URL") or os.environ.get("MINIO_ENDPOINT")
+ROOT = _ENV_ROOT or ("s3://lakehouse" if _MINIO_ENDPOINT else str(_DEFAULT_ROOT))
 
 
 def path(layer: str, table: str) -> str:
@@ -20,7 +24,9 @@ def path(layer: str, table: str) -> str:
 
     layer ∈ {"bronze", "silver", "gold", "scratch"}.
     """
-    p = ROOT / layer / table
+    if ROOT.startswith("s3://"):
+        return f"{ROOT}/{layer}/{table}"
+    p = Path(ROOT) / layer / table
     p.parent.mkdir(parents=True, exist_ok=True)
     return str(p)
 
